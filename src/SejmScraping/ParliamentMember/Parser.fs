@@ -35,22 +35,24 @@ let private regular parse (parts: string[]) _ =
     if Array.length parts = 2 then
         let (year, field: string) = parse (Array.last parts) "field"
         let field = Array.head (field.Split('-'))
-        Regular { Name = parts.[0]
-                  Year = year
-                  Field = Some(field.Trim()) }
+        Some { Name = parts.[0]
+               Year = year
+               Field = Some (field.Trim())
+               Title = None }
     else
         let (year, name) = parse (Array.last parts) "name"
         let name = Array.head (name.Split('-'))
-        Regular { Name = name.Trim()
-                  Year = year
-                  Field = option.None }
+        Some { Name = name.Trim()
+               Year = year
+               Field = None
+               Title = None }
 
 let private postgraduate parse (parts: string[]) (tokens: string[]) =
     let (year, field) = parse (Array.last parts) "field"
-    Titular { Name = parts.[0]
-              Year = year
-              Field = field
-              Title = tokens.[1].TrimStart() }
+    Some { Name = parts.[0]
+           Year = year
+           Field = Some field
+           Title = Some (tokens.[1].TrimStart()) }
 
 let private graduate parse (parts: string[]) (tokens: string[]) =
     if Array.length tokens = 1 then
@@ -58,10 +60,10 @@ let private graduate parse (parts: string[]) (tokens: string[]) =
     else
         let (year, title) = parse (Array.last tokens) "title"
         let field = tokens.[0].Trim()
-        Titular { Name = parts.[0]
-                  Year = year
-                  Field = field
-                  Title = title }
+        Some { Name = parts.[0]
+               Year = year
+               Field = Some field
+               Title = Some title }
 
 let private (|Postgraduate|Graduate|Regular|None|) (education, schoolData: string) =
     if String.IsNullOrEmpty education then None
@@ -89,7 +91,8 @@ let private school education (data: string) =
             | Regular -> regular
             | None -> (fun _ _ _ -> None)
         school parse parts tokens)
-    >> Array.filter (fun school -> school <> None))
+    >> Array.filter (fun school -> school <> None)
+    >> Array.map (fun school -> school.Value))
 
 let private person (input: Async<int * HtmlNode * IDictionary<string, string>>) =
     async {

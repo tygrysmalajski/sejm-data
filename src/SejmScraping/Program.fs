@@ -2,8 +2,8 @@
 open ParliamentMember.Parser
 
 let processMembers ids chunks =
-    ids
-    |> (Array.splitInto chunks
+    ids |>
+    (Array.splitInto chunks
         >> Array.collect
             (Array.map (download >> parse)
             >> Async.Parallel

@@ -7,18 +7,10 @@ type Birth =
       Place: string }
 
 type School =
-    | None
-    | Regular of Regular
-    | Titular of Titular
-and Regular =
-    { Name: string
-      Year: int
-      Field: option<string> }
-and Titular =
-    { Name: string
-      Year: int
-      Field: string
-      Title: string }
+  { Name: string
+    Year: int
+    Field: option<string>
+    Title: option<string> }
 
 type Person =
     { Id: int
