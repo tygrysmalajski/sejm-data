@@ -47,3 +47,5 @@ msbuild.wrn
 .vs/
 
 .ionide/
+.fake
+data/parliament-members.json
