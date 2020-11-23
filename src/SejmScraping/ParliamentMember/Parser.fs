@@ -7,20 +7,19 @@ open FSharp.Data
 open ParliamentMember.Types
 
 let private tokenYearPattern tokenName =
-    tokenName |> sprintf "(?<%s>.*) \((?<year>.*)\)" |> Regex
+    tokenName |> (sprintf "(?<%s>.*) \((?<year>.*)\)" >> Regex)
 
 let private name (content: HtmlNode) =
     (content.Descendants "h1" |> Seq.head).InnerText()
 
 let private image (content: HtmlNode) =
     let img = 
-        content.Descendants "div"
-        |> Seq.filter (fun x -> x.AttributeValue "class" = "partia")
-        |> Seq.collect (fun x -> x.Descendants "img")
-        |> Seq.head
+        content.Descendants "div" |>
+        (Seq.filter (fun x -> x.AttributeValue "class" = "partia")
+        >> Seq.collect (fun x -> x.Descendants "img")
+        >> Seq.head)
     img.AttributeValue "src"
-    |> Uri
-    |> (fun uri -> uri.AbsolutePath)
+    |> (Uri >> (fun uri -> uri.AbsolutePath))
 
 let private birth (data: string) =
     let tokens = data.Split ','
@@ -73,8 +72,8 @@ let private (|Postgraduate|Graduate|Regular|None|) (education, schoolData: strin
     else Regular
 
 let private school education (data: string) =
-    data.Split "\r\n"
-    |> Array.map(fun data ->
+    data.Split "\r\n" |>
+    (Array.map(fun data ->
         let parse input (tokenName: string) =
             let pattern = tokenYearPattern tokenName
             let matched = pattern.Match(input).Groups
@@ -90,7 +89,7 @@ let private school education (data: string) =
             | Regular -> regular
             | None -> (fun _ _ _ -> None)
         school parse parts tokens)
-    |> Array.filter (fun school -> school <> None)
+    >> Array.filter (fun school -> school <> None))
 
 let private person (input: Async<int * HtmlNode * IDictionary<string, string>>) =
     async {
@@ -116,30 +115,35 @@ let private parseInfo (input: Async<int * HtmlDocument>) =
         let info =
             html.Descendants "div"
             |> Seq.find (fun x -> x.HasId "title_content")
-        return (id, info, info.Descendants "div"
-            |> Seq.filter (fun x ->
+        return (id, info, info.Descendants "div" |>
+            (Seq.filter (fun x ->
                 let ``class`` = x.AttributeValue "class"
                 ``class`` = "partia" || ``class`` = "cv")
-            |> Seq.collect (fun x -> x.Descendants "li")
-            |> Seq.toArray)
+            >> Seq.collect (fun x -> x.Descendants "li")
+            >> Seq.toArray))
     }
 
 let private parseProperties (input: Async<int * HtmlNode * HtmlNode[]>) =
     async {
         let! (id, info, items) = input
-        return (id, info, items
-            |> Array.map (fun (x: HtmlNode) ->
-                x.Descendants "p"
-                |> Seq.toArray
-                |> (fun y ->
-                    (y.[0].AttributeValue "id", y.[1].InnerText())))
-            |> dict)
+        return (id, info, items |>
+            (Array.map (fun (x: HtmlNode) ->
+                x.Descendants "p" |>
+                (Seq.pairwise
+                >> Seq.map (fun (id, value) ->
+                    (id.AttributeValue "id", value.InnerText()))
+                >> Seq.head))
+            >> dict))
     }
 
 let parse (input: Async<int * HtmlDocument>) =
     async {
         let! (id, _) = input
-        let! result = Async.Catch(input |> (parseInfo >> parseProperties >> person))
+        let! result =
+            Async.Catch(input
+            |> (parseInfo
+                >> parseProperties
+                >> person))
         return
             match result with
             | Choice1Of2 parsed -> parsed
