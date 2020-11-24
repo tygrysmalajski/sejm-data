@@ -26,44 +26,51 @@ let private birth (data: string) =
     { Date = DateTime.Parse(tokens.[0])
       Place = tokens.[1].Trim() }
 
-let private education (data: string) =
-    let tokenName = "level"
-    let pattern = tokenYearPattern tokenName
-    pattern.Match(data).Groups.[tokenName].Value
+let private practice (data: string) =
+    if data = "brak" then [||]
+    else data.Split(',', StringSplitOptions.TrimEntries)
+
+let private scienceDegree (data: string) =
+    if String.IsNullOrEmpty data then None
+    else data.Split('(', StringSplitOptions.TrimEntries)
+        |> Array.head
+        |> Some
 
 let private regular parse (parts: string[]) _ =
+    let get tokenName =
+        let (year, token: string) = parse (Array.last parts) tokenName
+        let token = token.Split '-' |> Array.head
+        (year, token)
     if Array.length parts = 2 then
-        let (year, field: string) = parse (Array.last parts) "field"
-        let field = Array.head (field.Split('-'))
+        let (year, field) = get "field"
         Some { Name = parts.[0]
                Year = year
                Field = Some (field.Trim())
-               Title = None }
+               Degree = None }
     else
-        let (year, name) = parse (Array.last parts) "name"
-        let name = Array.head (name.Split('-'))
+        let (year, name) = get "name"
         Some { Name = name.Trim()
                Year = year
                Field = None
-               Title = None }
+               Degree = None }
 
 let private postgraduate parse (parts: string[]) (tokens: string[]) =
     let (year, field) = parse (Array.last parts) "field"
     Some { Name = parts.[0]
            Year = year
            Field = Some field
-           Title = Some (tokens.[1].TrimStart()) }
+           Degree = Some (tokens.[1].TrimStart()) }
 
 let private graduate parse (parts: string[]) (tokens: string[]) =
     if Array.length tokens = 1 then
         regular parse parts tokens
     else
-        let (year, title) = parse (Array.last tokens) "title"
+        let (year, degree) = parse (Array.last tokens) "degree"
         let field = tokens.[0].Trim()
         Some { Name = parts.[0]
                Year = year
                Field = Some field
-               Title = Some title }
+               Degree = Some degree }
 
 let private (|Postgraduate|Graduate|Regular|None|) (education, schoolData: string) =
     if String.IsNullOrEmpty education then None
@@ -97,22 +104,27 @@ let private school education (data: string) =
 let private person (input: Async<int * HtmlNode * IDictionary<string, string>>) =
     async {
         let! (id, info, properties) = input
-        let get label = properties.Item ("lbl" + label)
+        let get label =
+            match properties.TryGetValue ("lbl" + label) with
+            | true, value -> value
+            |_ -> String.Empty
         let education = "Wyksztalcenie" |> get
         return { Id = id
                  Name = name info
                  Image = image info
                  Party = "Lista" |> get
+                 Practice = "Staz" |> (get >> practice)
                  Club = "Klub" |> get
                  Votes = "Glosy" |> (get >> int)
                  Constituency = "Okreg" |> get
                  Birth = "Urodzony" |> (get >> birth)
                  Occupation = "Zawod" |> get
                  Education = education
+                 ScienceDegree = "Tytul" |> (get >> scienceDegree)
                  Schools = "Szkola" |> (get >> school education) }
     }
 
-let private parseInfo (input: Async<int * HtmlDocument>) =
+let private info (input: Async<int * HtmlDocument>) =
     async {
         let! (id, html) = input
         let info =
@@ -126,7 +138,7 @@ let private parseInfo (input: Async<int * HtmlDocument>) =
             >> Seq.toArray))
     }
 
-let private parseProperties (input: Async<int * HtmlNode * HtmlNode[]>) =
+let private properties (input: Async<int * HtmlNode * HtmlNode[]>) =
     async {
         let! (id, info, items) = input
         return (id, info, items |>
@@ -143,9 +155,9 @@ let parse (input: Async<int * HtmlDocument>) =
     async {
         let! (id, _) = input
         let! result =
-            Async.Catch(input
-            |> (parseInfo
-                >> parseProperties
+            Async.Catch(input |>
+                (info
+                >> properties
                 >> person))
         return
             match result with
