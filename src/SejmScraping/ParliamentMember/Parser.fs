@@ -142,7 +142,7 @@ let private properties (input: Async<int * HtmlNode * HtmlNode[]>) =
     async {
         let! (id, info, items) = input
         return (id, info, items |>
-            (Array.map (fun (x: HtmlNode) ->
+            (Array.map (fun x ->
                 x.Descendants "p" |>
                 (Seq.pairwise
                 >> Seq.map (fun (id, value) ->

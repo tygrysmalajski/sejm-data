@@ -21,4 +21,5 @@ let saveToJson (members: Types.Person[]) =
            Members = members |}
     let config = JsonConfig.create(jsonFieldNaming = Json.lowerCamelCase)
     let json = Json.serializeEx config content
-    File.WriteAllText("..\..\data\parliament-members.json", json)
+    let directory = Directory.CreateDirectory "..\..\data"
+    File.WriteAllText(sprintf "%s\parliament-members.json" directory.FullName, json)
